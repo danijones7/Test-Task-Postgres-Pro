@@ -1,39 +1,46 @@
-Шаг 1: Установка PostgreSQL через Docker
-1. Установите Docker, если он еще не установлен. Инструкции можно найти на официальном сайте Docker.
-2. Создайте и запустите контейнер PostgreSQL с помощью следующих команд:
+# 1. Установка PostgreSQL через Docker
 
-# Создаем и запускаем контейнер PostgreSQL
+* Создать и запустить контейнер PostgreSQL с помощью следующих команд:
+
+### Создаем и запускаем контейнер PostgreSQL
+```
 docker run --name academy-db -e POSTGRES_PASSWORD=mysecretpassword -d postgres
-3. Подключитесь к контейнеру PostgreSQL:
+```
 
-# Подключаемся к контейнеру PostgreSQL
+### Подключаемся к контейнеру PostgreSQL
+```
 docker exec -it academy-db psql -U postgres
-Шаг 2: Создание базы данных и таблиц
-Создайте базу данных academy:
+```
 
--- Создаем базу данных academy
+
+Создаем базу данных academy
+```
 CREATE DATABASE academy;
+```
+
 Подключитесь к базе данных academy:
-
-# Подключаемся к базе данных academy
+```
 \c academy
+```
 
 
--- Скрипт для создания таблиц
+# 2. Скрипт для создания таблиц
 
-
-CREATE TABLE Students (
+```
+CREATE TABLE students (
     s_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
 	start_year DATE NOT NULL
 );
-
+```
+```
 CREATE TABLE Courses (
     c_no SERIAL PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
 	hours INT NOT NULL
 );
-
+```
+```
 CREATE TABLE Exams (
 	PRIMARY KEY (s_id, c_no),
 	s_id INT NOT NULL,
@@ -42,59 +49,64 @@ CREATE TABLE Exams (
     FOREIGN KEY (c_no) REFERENCES Courses(c_no),
     FOREIGN KEY (s_id) REFERENCES students(s_id)
 );
+```
+# 3: Вставка данных в таблицы
 
-Шаг 3: Вставка данных в таблицы
-
--- Вставка данных в таблицы
-
-INSERT INTO Students (name, start_year) VALUES ('John', '01.09.2000'), ('Bill', '01.09.2000'), ('Lev', '01.09.2000') ;
-
-
-INSERT INTO Courses (title, hours) VALUES ('Math', 40), ('Physics', 55), ('Chemistry', 77);
-
+```
+INSERT INTO Students (name, start_year) VALUES 
+('John', '01.09.2000'), 
+('Bill', '01.09.2000'), 
+('Lev', '01.09.2000') ;
+```
+```
+INSERT INTO Courses (title, hours) VALUES 
+('Math', 40),
+('Physics', 55), 
+('Chemistry', 77);
+```
+```
 INSERT INTO exams (course_id, student_id, score) VALUES
 (1, 1, 85),
 (1, 2, 90),
 (2, 2, 80),
 (3, 3, 70);
-Шаг 4: Запросы к базе данных
+```
+
+# 4. Запросы к базе данных
+
 1. Запрос, который возвращает всех студентов, которые еще не сдали ни одного экзамена:
-
--- Запрос для получения студентов, которые не сдали ни одного экзамена
-
+```
 SELECT st.s_id, st.name
 FROM students st
 LEFT JOIN exams e ON st.s_id = e.s_id
 WHERE e.s_id IS NULL;
-
+```
 
 2. Запрос, который возвращает список студентов и количество сданных ими экзаменов. Только для студентов, у которых есть сданные экзамены:
-
--- Запрос для получения студентов и количества сданных ими экзаменов
-
+```
 SELECT st.s_id, st.name, COUNT(e.s_id) AS exams_count
 FROM students st
 JOIN exams e ON st.s_id = e.s_id
 GROUP BY st.s_id, st.name
 HAVING COUNT(e.s_id) > 0;
+```
 
 3. Запрос для получения списка курсов со средним баллом по экзамену, отсортированный по убыванию среднего балла:
-
--- Запрос для получения списка курсов со средним баллом по экзамену
-
+```
 SELECT co.c_no, co.title, ROUND(AVG(e.score)::numeric, 2) AS avg_score
 FROM courses co
 JOIN exams e ON co.c_no = e.c_no
 GROUP BY co.c_no, co.title
 ORDER BY avg_score DESC;
-Шаг 5: Генерация данных
+```
+
+# 5: Генерация данных
 Скрипт для генерации данных с помощью Python:
-python
-Copy code
+
 import psycopg2
 from faker import Faker
 
-# Настройки подключения
+#### Настройки подключения
 conn = psycopg2.connect(
     dbname="academy",
     user="postgres",
@@ -104,7 +116,7 @@ conn = psycopg2.connect(
 
 fake = Faker()
 
-# Функция для генерации данных
+### Функция для генерации данных
 def generate_data():
     cur = conn.cursor()
 

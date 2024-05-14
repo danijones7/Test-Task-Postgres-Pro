@@ -6,24 +6,18 @@
 ```
 docker run --name academy-db -e POSTGRES_PASSWORD=mysecretpassword -d postgres
 ```
-
 ### Подключаемся к контейнеру PostgreSQL
 ```
 docker exec -it academy-db psql -U postgres
 ```
-
-
 ### Создаем базу данных academy
 ```
 CREATE DATABASE academy;
 ```
-
 ### Подключитесь к базе данных academy:
 ```
 \c academy
 ```
-
-
 # 2. Скрипт для создания таблиц
 
 ```

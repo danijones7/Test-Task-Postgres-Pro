@@ -13,12 +13,12 @@ docker exec -it academy-db psql -U postgres
 ```
 
 
-Создаем базу данных academy
+### Создаем базу данных academy
 ```
 CREATE DATABASE academy;
 ```
 
-Подключитесь к базе данных academy:
+### Подключитесь к базе данных academy:
 ```
 \c academy
 ```

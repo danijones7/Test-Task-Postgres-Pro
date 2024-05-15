@@ -1,27 +1,54 @@
 # 1. Установка PostgreSQL через Docker
 
-* Создать и запустить контейнер PostgreSQL с помощью следующих команд:
+Устанавливаем Docker с официального сайта 
 
-### Создаем и запускаем контейнер PostgreSQL
+<https://docs.docker.com/get-docker/>
+
+Запускаем терминал и скачиваем образ PostgreSQL
 ```
-docker run --name academy-db -e POSTGRES_PASSWORD=mysecretpassword -d postgres
+docker pull postgres
 ```
-### Подключаемся к контейнеру PostgreSQL
+Создаем и запускем контейнер PostgreSQL
 ```
-docker exec -it academy-db psql -U postgres
+docker run --name my_postgres -e POSTGRES_PASSWORD=mysecretpassword -d postgres
 ```
-### Создаем базу данных academy
+Проверяем, что контейнер запущен:
 ```
-CREATE DATABASE academy;
+docker ps
 ```
-### Подключитесь к базе данных academy:
+Подключаемся к базе данных PostgreSQL внутри контейнера:
 ```
-\c academy
+docker exec -it my_postgres psql -U postgres
 ```
+Выйти из psql
+```
+\q
+```
+
+# 2. Создание БД academy
+
+Создаем файл "create_academy_db" в указанной директории
+```
+echo "CREATE DATABASE academy;" > C:\Users\Sowic\Desktop\Jessie\GB\PGStart\create_academy_db.sql
+```
+Копируем созданный файл в контейнер PostgreSQL
+```
+docker cp C:\Users\Sowic\Desktop\Jessie\GB\PGStart\create_academy_db.sql my_postgres:/create_academy_db.sql
+```
+Выполненяем скрипта внутри контейнера:
+```
+docker exec -it my_postgres psql -U postgres -f /create_academy_db.sql
+```
+Подключаемся к базе данных 
+```
+docker exec -it my_postgres psql -U postgres -d academy
+```
+
+
 # 2. Скрипт для создания таблиц
 
 ```
-CREATE TABLE students (
+CREATE TABLE Students (
     s_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
 	start_year DATE NOT NULL
@@ -41,30 +68,31 @@ CREATE TABLE Exams (
     c_no INT NOT NULL,
     score INT CHECK (score >= 1 AND score <= 5),
     FOREIGN KEY (c_no) REFERENCES Courses(c_no),
-    FOREIGN KEY (s_id) REFERENCES students(s_id)
+    FOREIGN KEY (s_id) REFERENCES Students(s_id)
 );
 ```
 # 3: Вставка данных в таблицы
 
 ```
 INSERT INTO Students (name, start_year) VALUES 
-('John', '01.09.2000'), 
-('Bill', '01.09.2000'), 
-('Lev', '01.09.2000') ;
+('Max Miles', '01.09.2000'), 
+('Freddy McDowel', '01.09.2000'), 
+('Mark Browns', '01.09.2000') ;
 ```
 ```
 INSERT INTO Courses (title, hours) VALUES 
 ('Math', 40),
 ('Physics', 55), 
-('Chemistry', 77);
+('Chemistry', 77),
+('English Literature', 50);
 ```
 ```
-INSERT INTO xams (c_no, s_id, score) VALUES
+INSERT INTO Exams (s_id, c_no, score) VALUES
 (1, 1, 5),
-(2, 1, 4),
-(3, 1, 5),
-(3, 1, 3);
-(3, 2, 3);
+(1, 2, 4),
+(1, 3, 5),
+(2, 1, 3),
+(3, 2, 3),
 (3, 3, 3);
 ```
 
@@ -72,10 +100,20 @@ INSERT INTO xams (c_no, s_id, score) VALUES
 
 1. Запрос, который возвращает всех студентов, которые еще не сдали ни одного экзамена:
 ```
-SELECT st.s_id, st.name
-FROM students st
-LEFT JOIN exams e ON st.s_id = e.s_id
-WHERE e.s_id IS NULL;
+SELECT students.s_id, students.name
+FROM students 
+LEFT JOIN exams ON students.s_id = exams.s_id
+WHERE exams.s_id IS NULL;
+```
+или 
+```
+SELECT students.s_id, students.name
+FROM Students
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM Exams
+    WHERE Exams.s_id = Students.s_id
+);
 ```
 
 2. Запрос, который возвращает список студентов и количество сданных ими экзаменов. Только для студентов, у которых есть сданные экзамены:
@@ -84,64 +122,126 @@ SELECT st.s_id, st.name, COUNT(e.s_id) AS exams_count
 FROM students st
 JOIN exams e ON st.s_id = e.s_id
 GROUP BY st.s_id, st.name
-HAVING COUNT(e.s_id) > 0;
+ORDER BY st.s_id;
 ```
 
 3. Запрос для получения списка курсов со средним баллом по экзамену, отсортированный по убыванию среднего балла:
 ```
-SELECT co.c_no, co.title, ROUND(AVG(e.score)::numeric, 2) AS avg_score
-FROM courses co
-JOIN exams e ON co.c_no = e.c_no
-GROUP BY co.c_no, co.title
-ORDER BY avg_score DESC;
+SELECT courses.c_no, courses.title, ROUND(AVG(exams.score), 2) AS average_score
+FROM courses
+JOIN exams ON courses.c_no = exams.c_no
+GROUP BY courses.c_no, courses.title
+ORDER BY average_score DESC;
 ```
 
 # 5: Генерация данных
-Скрипт для генерации данных с помощью Python:
+#### Напишем скрипт для генерации случайных данных с помощью Python:
+
+Работаем в VSCode 
+* Установиv расширение Python для VSCode
+* Установим библиотеки psycopg2 и Faker
+```
+pip install psycopg2
+pip install Faker
+```
+
+```python
 
 import psycopg2
+import random
 from faker import Faker
 
-#### Настройки подключения
+# Подключение к базе данных PostgreSQL
 conn = psycopg2.connect(
     dbname="academy",
     user="postgres",
     password="mysecretpassword",
-    host="localhost"
+    host="localhost",
+    port="5432"
 )
+cur = conn.cursor()
 
+# Создание объекта Faker для генерации случайных данных
 fake = Faker()
 
-### Функция для генерации данных
-def generate_data():
-    cur = conn.cursor()
+# Функция для создания таблиц, если они еще не существуют
 
-    # Вставка студентов
-    for _ in range(100):
-        cur.execute("INSERT INTO students (name) VALUES (%s)", (fake.name(),))
 
-    # Вставка курсов
-    courses = ['Math', 'Physics', 'Chemistry', 'Biology', 'History']
-    for course in courses:
-        cur.execute("INSERT INTO courses (name) VALUES (%s)", (course,))
-
-    # Вставка экзаменов
-    cur.execute("SELECT id FROM students")
-    student_ids = [row[0] for row in cur.fetchall()]
-    
-    cur.execute("SELECT id FROM courses")
-    course_ids = [row[0] for row in cur.fetchall()]
-
-    for student_id in student_ids:
-        for course_id in course_ids:
-            cur.execute(
-                "INSERT INTO exams (course_id, student_id, grade) VALUES (%s, %s, %s)",
-                (course_id, student_id, fake.random_int(min=0, max=100))
-            )
-
+def create_tables():
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS Students (
+            s_id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            start_year DATE NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS Courses (
+            c_no SERIAL PRIMARY KEY,
+            title VARCHAR(100) NOT NULL,
+            hours INTEGER NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS Exams (
+            s_id INTEGER NOT NULL,
+            c_no INTEGER NOT NULL,
+            score INTEGER CHECK (score >= 1 AND score <= 5),
+            FOREIGN KEY (s_id) REFERENCES Students(s_id),
+            FOREIGN KEY (c_no) REFERENCES Courses(c_no),
+            PRIMARY KEY (s_id, c_no)
+        )
+    """)
     conn.commit()
-    cur.close()
 
-generate_data()
+# Функция для генерации и наполнения таблицы Students
+
+
+def generate_students():
+    cur.execute("SELECT COUNT(*) FROM Students")
+    count = cur.fetchone()[0]
+    if count < 10:  # Генерируем только если записей меньше 10
+        for _ in range(10 - count):
+            name = fake.name()
+            start_year = fake.date_between(start_date='-5y', end_date='today')
+            cur.execute(
+                "INSERT INTO Students (name, start_year) VALUES (%s, %s)", (name, start_year))
+        conn.commit()
+
+# Функция для генерации и наполнения таблицы Courses
+
+
+def generate_courses():
+    cur.execute("SELECT COUNT(*) FROM Courses")
+    count = cur.fetchone()[0]
+    if count < 4:  # Генерируем только если записей меньше 4
+        courses = [('Математика',), ('Физика',), ('История',), ('Литература',)]
+        for course in courses[count:]:
+            hours = random.randint(30, 90)
+            cur.execute(
+                "INSERT INTO Courses (title, hours) VALUES (%s, %s)", (course[0], hours))
+        conn.commit()
+
+# Функция для генерации и наполнения таблицы Exams
+
+
+def generate_exams():
+    cur.execute("SELECT COUNT(*) FROM Exams")
+    count = cur.fetchone()[0]
+    if count == 0:  # Генерируем только если таблица пуста
+        cur.execute(
+            "INSERT INTO Exams (s_id, c_no, score) SELECT s_id, c_no, %s FROM Students CROSS JOIN Courses", (random.randint(2, 5),))
+        conn.commit()
+
+
+# Вызываем функцию для создания таблиц
+create_tables()
+
+# Вызываем функции для генерации данных
+generate_students()
+generate_courses()
+generate_exams()
+
+# Закрытие соединения
+cur.close()
 conn.close()
-
